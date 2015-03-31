@@ -20,4 +20,5 @@ generalities.
   help guide the design process so all APIs can feel as uniform as possible.
 * `fs.md` - Some revised API for the file system module.
 * `tcp.md` - A TCP API, instead of unified `'net'` module.
+* `udp.md` - A UDP API
 * `stream.md` - Some streams examples that will be used to write the spec.
