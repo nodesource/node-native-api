@@ -213,3 +213,34 @@ server.onconnection(function onConnection(c) {
   c.write('world!');
 });
 ```
+
+
+#### `client.write(data[, callback[, ... vargs]])`
+
+* `data` - TBD
+* `callback` - `Function`
+* Returns `Object` write request
+
+**Usage:**
+```javascript
+server.onconnection(function(c) {
+  let req = c.write('hi!', onWritten);
+  req.time = process.hrtime();
+});
+
+function onWritten(err) {
+  if (err) { /* handle error */ }
+  let t = process.hrtime(this.time);
+  console.log(`Write req took ${t[0] * 1e3 + t[1] / 1e6} ms`);
+}
+```
+
+**Reason:**
+By returning the actual write request created for the write information about
+the write request can be tracked during the lifetime of the request.
+
+**Issues:**
+One issue is that under the hood `trywrite` will attempted to be used
+automatically.  Which means the write may have succeeded immediately. Another
+issue is that `writev` is used under the hood which means while the write is
+queued to be written, it will not actually be sent until the data is flushed.
