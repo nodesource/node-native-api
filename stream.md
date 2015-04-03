@@ -154,9 +154,11 @@ Possibly `abort()` connections that have too many bytes pending.
 ```javascript
 let server = new TCP();
 
-server.onconnection(function onConnection(c) {
-  c.onreadable(cOnReadable);
-}).listen(8001);
+// Setup the default onreadable() callback for all connections.
+server.onreadable(cOnReadable);
+
+// Now start listening for new connections.
+server.listen(8001);
 
 function cOnReadable() {
   // Shorthand the reference to the connection server.
