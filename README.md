@@ -2,12 +2,14 @@
 
 The purpose of these documents is to provide a uniform API across Node. It is
 meant to be more low-level than the current API, has been tuned for performance
-and flexibility. This API should accomplish two basic things:
+and flexibility. This API has the following goals:
 
 1) Be so light weight that it offers no observable impact on users' code.
 
 2) Be flexible enough that any other desired interface could be written using
    it.
+
+3) Be resilient and allow the developer to recover.
 
 
 ### Documents
