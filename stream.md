@@ -207,3 +207,109 @@ function abortConnection(c) {
 **Note:** The `queued()` callback must be defined by the implementing stream.
 Because for non byte streams it's up to the implementor to determine the value
 that `queued()` should return.
+
+
+This example shows usage of the `onclose()` error argument to determine what's
+happening with the stream, and recovery of the pipeline.
+```javascript
+// Open log file to which all streams will be aggregated and logged.
+let fh = new File('random_log_file');
+// A custom stream that is meant to aggregate many different streams into a
+// single stream. This way many new TCP connections can all pipe to the same
+// stream and have their contents logged correctly.
+let sag = new StreamAggregation();
+let server = new TCP();
+
+
+// Passing as arguments for portability sake. Don't like depending on variable
+// scoping for asynchronous calls.
+fh.open('r+', function fhOnOpen(err, sag, server) {
+  // There was an error opening the log file. Cannot continue from here.
+  if (err)
+    throw err;
+
+  // Pipe the stream aggregator to the file.
+  sag.pipe(this);
+
+  // Now start accepting connections to the server.
+  server.listen(8001);
+}, sag, server);
+
+
+// The "onclose()" event lets the user know that the stream is able to be
+// closed. The input sources from piping results in ref counting to the piped
+// stream. When all connections have closed and ref count == 0 this callback is
+// called. Though it does _not_ mean the stream _will_ be closed, simply that
+// the stream is preparing to be closed. It is possible to keep this stream
+// alive. The only time it is not possible to keep the stream alive is if an
+// Error is passed to the stream. In that case something critically bad
+// happened and the stream must close so it can cleanup all its internal
+// resources.
+//
+// Since this callback is only suggestive, there's an internal close() callback
+// that needs to be set by the implementor that's run as the final step. This
+// callback cleans up all resources, and it's function should essentially be
+// invisible to the user.
+// TODO(trevnorris): What exactly are the semantics for keeping the stream
+// alive? There should be a call that simply states "keep this stream alive and
+// don't call the onclose callback again until the ref counter increases then
+// reaches zero again". Right now using .holdOpen(), but would love a better
+// name.
+sag.onclose(function sagOnClose(err, server) {
+  // Critical error on the stream itself. Nothing to do with the incoming
+  // streams. In this case we can pause the attached streams and attempt to
+  // resurrect the stream.
+  if (err) {
+    // Prevent the server from receiving any new connections until the stream
+    // error has been handled.
+    server.pause();
+
+    // Now Walk the list of handles that have been attached to this stream via
+    // .pipe() and pause them.
+    // TODO(trevnorris): Not married to .handles(). Was thinking it would
+    // return .values() from the internal Set() of handles.
+    for (let handle of this.handles())
+      handle.readStop();
+
+    // Recover the stream. This is implementation defined, and nothing
+    // specifically to do with streams.
+    this.recover(sagOnRecover, server);
+
+    return;
+  }
+
+  // There was no error. All the existing connections simply closed, so keep
+  // this stream alive and don't run the internal close cleanup.
+  this.holdOpen();
+}, server);
+
+
+function sagOnRecover(err, server) {
+  // If there was an error recovering the stream then bring down the server.
+  // Something is seriously wrong.
+  if (err)
+    throw err;
+
+  // Stream has recovered. Resume the server and resume reading from all the
+  // connections.
+  for (let handle of this.handles())
+    handle.readStart();
+  server.resume();
+}
+
+
+// Setup the default onclose callback for all new connections
+server.onclose(function cOnClose(err) {
+  if (err) {
+    // Server had a critical error. Should probably bring down the process.
+  }
+});
+
+
+// TODO(trevnorris): Should a default pipe for all new connections be able to
+// be set via server.pipe(dest)?
+server.onconnection(function onConnection(c, sag) {
+  // Pipe the stream aggregator to the log file.
+  c.pipe(sag);
+}, sag);
+```

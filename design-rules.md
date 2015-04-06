@@ -44,6 +44,9 @@ asynchronously.
 The calling context (e.g. `this`) of all callbacks should be the same as the
 handle making the call.
 
+Depending on variable scope in outer function closures is prohibited. If a
+variable needs to reach a callback then it should be passed as an argument.
+
 
 ------
 
